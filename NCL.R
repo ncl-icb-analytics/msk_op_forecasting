@@ -91,8 +91,8 @@ NCL_MSK_trust <-
   )+
   labs(title = "Orthopaedic, Rheumatology and Pain Management Referrals - All NCL providers"
        , subtitle = "Forecast computed by 'Holt-Winters method', based on Apr-21 - Mar-23,
-       \nRoyal Free is orthopaedic and rheumatology were inputed where articficiNCLy low through referNCL restriction,
-       \nWhittingon rheumatology imputed in March-22 due to outlier values, RNOH missing data imputed Mar-21"
+       \nRoyal Free orthopaedic and rheumatology were partially inputed where artificially low through referral restriction,
+       \nWhittingon rheumatology imputed in March-22 due to outlier values, RNOH missing data imputed in Mar-21"
   )+
   theme_minimal()+
   theme(legend.position = "bottom", 
@@ -131,26 +131,84 @@ NCL_MSK_all %>% autoplot(Referrals)
 NCL_MSK_all %>%  ACF() %>%  autoplot()
 NCL_MSK_all %>%  ACF(difference(Referrals)) %>%  autoplot()
 
+# Visulaise effects of rolling average
+NCL_MSK_all <- NCL_MSK_all %>% 
+  mutate(
+    `6-MA` = slider::slide_dbl(Referrals, mean,
+                               .before = 6, .after = 0, .complete = TRUE),
+    `3-MA` = slider::slide_dbl(Referrals, mean,
+                               .before = 3, .after = 0, .complete = TRUE)
+  )
 
-mods_NCL_MSK_all <-
+NCL_MSK_all %>% 
+  autoplot(Referrals) +
+  geom_line(aes(y = `6-MA`), linetype = "dotted") +
+  geom_line(aes(y = `3-MA`), linetype = "dashed") +
+  labs(y = "Referrals") +
+  guides(colour = guide_legend(title = "series"))
+
+
+mods_NCL_MSK_all_mn <-
   NCL_MSK_all %>% 
   filter(Date >= yearmonth("2021 Jan")) %>% 
   #stretch_tsibble(.init = 10) %>% 
   model(
-    mean = MEAN(Referrals),
-    naive = NAIVE(Referrals),
-    snaive = SNAIVE(Referrals ~ lag("year")),
-    drift = RW(Referrals ~ drift()),
-    ets = ETS(Referrals),
-    ses = ETS(Referrals ~ error("A")+trend("N")+season("N")),
+    # mean = MEAN(Referrals),
+    # naive = NAIVE(Referrals),
+    # snaive = SNAIVE(Referrals ~ lag("year")),
+    # drift = RW(Referrals ~ drift()),
+    # ets = ETS(Referrals),
+    # ses = ETS(Referrals ~ error("A")+trend("N")+season("N")),
     holt_winter_a = ETS(Referrals ~ error("A")+trend("A")+season("A")),
     holt_winter_ad = ETS(Referrals ~ error("A")+trend("Ad")+season("A"))
     #holt_winter_m = ETS(Referrals ~ error("A")+trend("A")+season("M"))
     #arima = ARIMA(Referrals)
   )
 
-NCL_MSK_all_forecast <-
-  mods_NCL_MSK_all %>% 
+mods_NCL_MSK_all_3 <-
+  NCL_MSK_all %>% 
+  filter(Date >= yearmonth("2021 Jan")) %>% 
+  #stretch_tsibble(.init = 10) %>% 
+  model(
+    # mean = MEAN(Referrals),
+    # naive = NAIVE(Referrals),
+    # snaive = SNAIVE(Referrals ~ lag("year")),
+    # drift = RW(Referrals ~ drift()),
+    # ets = ETS(Referrals),
+    # ses = ETS(Referrals ~ error("A")+trend("N")+season("N")),
+    holt_winter_a3 = ETS(`3-MA` ~ error("A")+trend("A")+season("A")),
+    holt_winter_ad3 = ETS(`3-MA` ~ error("A")+trend("Ad")+season("A")),
+    #holt_winter_m = ETS(Referrals ~ error("A")+trend("A")+season("M"))
+    #arima = ARIMA(Referrals)
+  )
+
+mods_NCL_MSK_all_6<-
+  NCL_MSK_all %>% 
+  filter(Date >= yearmonth("2021 Jan")) %>% 
+  #stretch_tsibble(.init = 10) %>% 
+  model(
+    # mean = MEAN(Referrals),
+    # naive = NAIVE(Referrals),
+    # snaive = SNAIVE(Referrals ~ lag("year")),
+    # drift = RW(Referrals ~ drift()),
+    # ets = ETS(Referrals),
+    # ses = ETS(Referrals ~ error("A")+trend("N")+season("N")),
+    holt_winter_a6 = ETS(`6-MA` ~ error("A")+trend("A")+season("A")),
+    holt_winter_ad6 = ETS(`6-MA` ~ error("A")+trend("Ad")+season("A"))
+    #holt_winter_m = ETS(Referrals ~ error("A")+trend("A")+season("M"))
+    #arima = ARIMA(Referrals)
+  )
+
+NCL_MSK_all_forecast_mn <-
+  mods_NCL_MSK_all_mn %>% 
+  forecast(h="60 months") 
+
+NCL_MSK_all_forecast3 <-
+  mods_NCL_MSK_all_3 %>% 
+  forecast(h="60 months") 
+
+NCL_MSK_all_forecast6 <-
+  mods_NCL_MSK_all_6 %>% 
   forecast(h="60 months") 
 
 # a<- NCL_MSK_forecast %>% 
@@ -165,7 +223,7 @@ NCL_MSK_all_forecast <-
 
 
 NCL_MSK_all_hw <-
-  NCL_MSK_all_forecast %>% 
+  NCL_MSK_all_forecast_mn %>% 
   hilo(95) %>% 
   filter( .model == "holt_winter_ad") %>% 
   #filter(((Trust %in% c("RFL", "Whitt") & .model == "holt_winter_ad")) | ((!Trust %in% c("RFL", "Whitt")) & .model == "holt_winter_a")) %>% 
@@ -180,10 +238,48 @@ NCL_MSK_all_hw <-
   NCL_MSK_all_hw %>% 
   select(Referrals, .model, Date, .mean, lcl, ucl)
 
+
+NCL_MSK_all_hw3 <-
+  NCL_MSK_all_forecast3 %>% 
+  hilo(95) %>% 
+  filter( .model == "holt_winter_ad3") %>% 
+  #filter(((Trust %in% c("RFL", "Whitt") & .model == "holt_winter_ad")) | ((!Trust %in% c("RFL", "Whitt")) & .model == "holt_winter_a")) %>% 
+  mutate(portion = "Forecast") 
+
+
+NCL_MSK_all_hw3$lcl <- NCL_MSK_all_hw3$`95%`$lower
+NCL_MSK_all_hw3$ucl <- NCL_MSK_all_hw3$`95%`$upper
+
+
+NCL_MSK_all_hw3 <-
+  NCL_MSK_all_hw3 %>% 
+  select(Referrals = `3-MA`, .model, Date, .mean, lcl, ucl)
+
+
+NCL_MSK_all_hw6 <-
+  NCL_MSK_all_forecast6 %>% 
+  hilo(95) %>% 
+  filter( .model == "holt_winter_ad6") %>% 
+  #filter(((Trust %in% c("RFL", "Whitt") & .model == "holt_winter_ad")) | ((!Trust %in% c("RFL", "Whitt")) & .model == "holt_winter_a")) %>% 
+  mutate(portion = "Forecast") 
+
+
+NCL_MSK_all_hw6$lcl <- NCL_MSK_all_hw6$`95%`$lower
+NCL_MSK_all_hw6$ucl <- NCL_MSK_all_hw6$`95%`$upper
+
+
+NCL_MSK_all_hw6 <-
+  NCL_MSK_all_hw6 %>% 
+  select(Referrals = `6-MA`, .model, Date, .mean, lcl, ucl)
+
+
+
 NCL_MSK_all_trust <-
   ggplot(NCL_MSK_all, aes(x= as.Date(Date)))+
   geom_line(aes(y=Referrals), linewidth=1)+
   geom_line(aes(y=.mean), data=NCL_MSK_all_hw, linewidth=1, alpha=0.6)+
+  #geom_line(aes(y=.mean), data=NCL_MSK_all_hw3, linewidth=1, alpha=0.6, col = "green")+
+  #geom_line(aes(y=.mean), data=NCL_MSK_all_hw6, linewidth=1, alpha=0.6, col = "orange")+
   geom_smooth(aes(y=.mean), method="lm", data=NCL_MSK_all_hw, linewidth=1
               , se=FALSE, linetype="dashed", alpha=0.6)+
   geom_vline(xintercept = as.Date("01/04/2023", format = "%d/%m/%Y"), col = "red"
@@ -200,10 +296,10 @@ NCL_MSK_all_trust <-
                , date_minor_breaks =  "2 month"
                
   )+
-  labs(title = "Orthopaedic, Rheumatology and Pain Management Referrals combine - All NCL providers"
+  labs(title = "Orthopaedic, Rheumatology and Pain Management Referrals combined - All NCL providers"
        , subtitle = "Forecast computed by 'Holt-Winters method', based on Apr-21 - Mar-23,
-       \nRoyal Free is orthopaedic and rheumatology were inputed where articficiNCLy low through referNCL restriction,
-       \nWhittingon rheumatology imputed in March-22 due to outlier values, RNOH missing data imputed Mar-21"
+       \nRoyal Free orthopaedic and rheumatology were partly inputed where artificially low through referral restriction,
+       \nWhittingon rheumatology imputed in March-22 due to outlier values, RNOH missing data imputed in Mar-21"
   )+
   theme_minimal()+
   theme(legend.position = "bottom", 

@@ -92,7 +92,7 @@ all_MSK_trust <-
   )+
   labs(title = "Orthopaedic, Rheumatology and Pain Management Referrals - by providers"
        , subtitle = "Forecast computed by 'Holt-Winters method', based on Apr-21 - Mar-23,
-       \nRoyal Free is orthopaedic and rheumatology were inputed where articficially low through referall restriction,
+       \nRoyal Free is orthopaedic and rheumatology were inputed where articficially low through referal restriction,
        \nWhittingon rheumatology imputed in March-22 due to outlier values, RNOH missing data imputed Mar-21"
   )+
   theme_minimal()+
@@ -107,24 +107,3 @@ all_MSK_trust
 
 
 
-
-##### Cross-validation #####
-
-
-mods2 <-
-  all_MSK %>% 
-  filter(Date >= yearmonth("2021 Apr")) %>% 
-  stretch_tsibble(.init = 3) %>% 
-  model(
-    mean = MEAN(Referrals),
-    naive = NAIVE(Referrals),
-    snaive = SNAIVE(Referrals ~ lag("year")),
-    drift = RW(Referrals ~ drift()),
-    #ets = ETS(Referrals),
-    #ses = ETS(Referrals ~ error("A")+trend("N")+season("N")),
-    holt_winter_a = ETS(Referrals ~ error("A")+trend("A")+season("A")),
-    holt_winter_m = ETS(Referrals ~ error("A")+trend("A")+season("M"))
-    #arima = ARIMA(Referrals ~ pdq(0,1,1) + PDQ(0,1,1))
-  )
-
-accuracy(mods2)

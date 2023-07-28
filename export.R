@@ -7,7 +7,9 @@ ggsave("output/all_MSK_trust.png", plot = all_MSK_trust)
 ggsave("output/NCL_spec.png", plot = NCL_MSK_trust)
 ggsave("output/NCL_MSK_all.png", plot= NCL_MSK_all_trust)
 
-
+NCL_MSK_trust
+all_MSK_trust
+NCL_MSK_all_trust
 
 write_csv(tno_hw, file = "output/tno_forecast.csv")
 write_csv(rheum_hw, file = "output/rheum_forecast.csv")
@@ -38,6 +40,8 @@ tno_mods <-
   select(Trust, .mean, Date) %>% 
   do(model = lm(.mean ~ Date, data = .))
 
+
+# pull out coefficients
 tno_subs <- lapply(tno_mods[[2]], coef)
 
 rheum_mods <-
@@ -96,3 +100,89 @@ per_growth <-
         ))
 
 per_growth 
+
+
+
+
+# Replacement section for the error over the coefficients above.
+# Rationale is change from month1 to month 60 in prediction
+# Percentage change: (month60 - month1) / month1
+
+# Total
+NCL_MSK_all_hw %>% 
+  slice_head() %>% 
+  select(.mean) 
+#2431
+
+NCL_MSK_all_hw %>% 
+  slice_tail() %>% 
+  select(.mean) 
+# 2656
+
+(2656 - 2431) / 2431
+
+# Function for pulling out fist and last and doing percentage change.
+fun <-
+  function(x, max_index){
+    (x[[max_index]]-x[[1]])/x[[1]]
+  }
+
+# Tno
+tno_preds <-  lapply(tno_mods[[2]], predict)
+
+tno_perc_change <- lapply(tno_preds, lm_perc_change_fun, max_index = 60)
+
+# pain
+pain_preds <-  lapply(pain_mods[[2]], predict)
+
+pain_perc_change <- lapply(pain_preds, lm_perc_change_fun, max_index = 60)
+
+# Rheum
+rheum_preds <-  lapply(rheum_mods[[2]], predict)
+
+rheum_perc_change <- lapply(rheum_preds, lm_perc_change_fun, max_index = 60)
+
+# all_trust
+all_MSK_mods_preds <-  lapply(all_MSK_mods[[2]], predict)
+
+all_MSK_mods_perc_change <- lapply(all_MSK_mods_preds, lm_perc_change_fun, max_index = 60)
+
+# NCL
+NCL_preds <-  lapply(NCL_mods[[2]], predict)
+
+NCL_perc_change <- lapply(NCL_preds, lm_perc_change_fun, max_index = 60)
+
+
+# NCL total
+NCL_all_preds <-  predict(NCL_mods_all)
+
+NCL_all_perc_change <- lm_perc_change_fun(NCL_all_preds, max_index = 60)
+
+
+
+
+
+unlist(tno_perc_change)
+
+
+# Assemble into table
+per_growth_2<-
+  data.frame(
+    Trust = c(tno_mods[[1]])
+    , tno = unlist(tno_perc_change)  
+    , rheum = unlist(rheum_perc_change)  
+    , pain = unlist(pain_perc_change) 
+    , all = unlist(all_MSK_mods_perc_change)
+  )
+
+per_growth_2 <-
+  rbind(per_growth_2,
+        data.frame(
+          Trust = "All",
+          tno = NCL_perc_change[[1]],
+          rheum = NCL_perc_change[[2]],
+          pain = NCL_perc_change[[3]],
+          all = NCL_all_perc_change 
+        ))
+
+per_growth_2

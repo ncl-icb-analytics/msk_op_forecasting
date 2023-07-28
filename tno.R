@@ -93,7 +93,9 @@ components(dcmp) %>%  autoplot()
 TnO <- TnO %>% 
   mutate(
     `6-MA` = slider::slide_dbl(Referrals, mean,
-                               .before = 6, .after = 0, .complete = TRUE)
+                               .before = 6, .after = 0, .complete = TRUE),
+    `3-MA` = slider::slide_dbl(Referrals, mean,
+                               .before = 3, .after = 0, .complete = TRUE)
   )
 
 
@@ -101,7 +103,8 @@ TnO <- TnO %>%
 
 TnO %>% 
   autoplot(Referrals) +
-  geom_line(aes(y = `6-MA`)) +
+  geom_line(aes(y = `6-MA`), linetype = "dotted") +
+  geom_line(aes(y = `3-MA`), linetype = "dashed") +
   labs(y = "Referrals") +
   guides(colour = guide_legend(title = "series"))
 
@@ -197,24 +200,3 @@ tno_trust
 
 
 
-
-
-##### Cross-validation #####
-
-
-mods2 <-
-  TnO %>% 
-  filter(year(Date) >=2021) %>% 
-  stretch_tsibble(.init = 6) %>% 
-  model(
-    mean = MEAN(Referrals),
-    naive = NAIVE(Referrals),
-    snaive = SNAIVE(Referrals ~ lag("year")),
-    drift = RW(Referrals ~ drift()),
-    #ets = ETS(Referrals),
-    #ses = ETS(Referrals ~ error("A")+trend("N")+season("N")),
-    #holt_winter = ETS(Referrals ~ error("A")+trend("A")+season("A"))
-    arima = ARIMA(Referrals ~ pdq(0,1,1) + PDQ(0,1,1))
-  )
-
-accuracy(mods2)
